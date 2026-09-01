@@ -4,7 +4,7 @@ FastAPI backend for the LA App platform (Content Factory).
 
 ## Tech Stack
 
-- **Python 3.11+**
+- **Python >=3.12,<3.13**
 - **FastAPI** — Web framework
 - **SQLAlchemy 2.0** — ORM
 - **Pydantic v2** — Data validation

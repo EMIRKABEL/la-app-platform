@@ -14,7 +14,6 @@ build/
 .eggs/
 *.whl
 pip-wheel-metadata/
-.python-version
 .venv/
 venv/
 env/

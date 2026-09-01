@@ -35,7 +35,7 @@ This repository is in its initial scaffold stage. Each folder contains a placeho
 
 ### Prerequisites
 
-- Python 3.11+
+- Python >=3.12,<3.13
 - Node.js 18+
 - Docker & Docker Compose
 
