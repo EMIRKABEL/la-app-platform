@@ -59,6 +59,9 @@ def _override_get_db():
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
     """Create all tables in the in-memory SQLite database."""
+    # Ensure all models are imported so Base.metadata knows about them
+    import app.models  # noqa: F401 — side-effect import
+
     Base.metadata.create_all(bind=test_engine)
     yield
     Base.metadata.drop_all(bind=test_engine)

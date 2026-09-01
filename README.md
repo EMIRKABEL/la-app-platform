@@ -94,6 +94,37 @@ Frontend runs at `http://localhost:3000`.
 3. Open `http://localhost:3000` in your browser.
 
 4. Navigate to **Courses** to create and view courses.
+5. Click a course to open its detail page — create **Units** and **Lessons**.
+6. Open a lesson to upload **curriculum files** (PPTX, PDF, DOCX, XLSX).
+
+### Content Hierarchy
+
+Content is organized as **Course → Unit → Lesson**:
+
+- A **Course** is the top-level container (e.g. "English A1")
+- A **Unit** belongs to a Course (e.g. "Unit 1: Greetings")
+- A **Lesson** belongs to a Unit (e.g. "Lesson 1: Hello and Goodbye")
+- Each Lesson can have **Curriculum Source** files uploaded
+
+### Curriculum Upload Workflow
+
+1. Create a Course
+2. Create a Unit inside the Course
+3. Create a Lesson inside the Unit
+4. Open the Lesson and click **Upload Curriculum**
+5. Select a `.pptx`, `.pdf`, `.docx`, or `.xlsx` file
+6. The file is stored locally and a `CurriculumSource` record is created
+7. The curriculum list on the Lesson page refreshes automatically
+
+### Local Storage
+
+Uploaded curriculum files are stored under `storage/curriculum/` during
+development. The storage root is configured via `STORAGE_ROOT` in
+`backend/.env`.
+
+The backend uses a `StorageProvider` abstraction (`LocalStorageProvider`
+for development) so storage can later move to S3, Cloudflare R2, Supabase
+Storage, or MinIO without changing application logic.
 
 ### Docker
 

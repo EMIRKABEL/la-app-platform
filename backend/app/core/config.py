@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "la-app-backend"
     DEBUG: bool = False
 
+    # Local file storage root (relative paths resolve from the backend/ dir)
+    STORAGE_ROOT: str = "../storage"
+
 
 @lru_cache
 def get_settings() -> Settings:

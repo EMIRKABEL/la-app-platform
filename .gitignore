@@ -72,3 +72,9 @@ docker-compose.override.yml
 *.local
 tmp/
 temp/
+
+# ---- Local file storage (curriculum uploads, generated content) ----
+/storage/*
+!/storage/README.md
+backend/storage/
+

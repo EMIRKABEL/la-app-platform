@@ -91,6 +91,91 @@ Tests use SQLite in-memory and do **not** require a running PostgreSQL instance.
 | `GET` | `/api/courses` | List all courses (newest first) |
 | `POST` | `/api/courses` | Create a new course |
 | `GET` | `/api/courses/{course_id}` | Get a single course (404 if not found) |
+| `GET` | `/api/courses/{course_id}/units` | List all units in a course |
+| `POST` | `/api/courses/{course_id}/units` | Create a new unit in a course |
+| `GET` | `/api/units/{unit_id}` | Get a single unit (404 if not found) |
+| `GET` | `/api/units/{unit_id}/lessons` | List all lessons in a unit |
+| `POST` | `/api/units/{unit_id}/lessons` | Create a new lesson (default status: draft) |
+| `GET` | `/api/lessons/{lesson_id}` | Get a single lesson (404 if not found) |
+| `POST` | `/api/lessons/{lesson_id}/curriculum` | Upload a curriculum file (multipart/form-data) |
+| `GET` | `/api/lessons/{lesson_id}/curriculum` | List curriculum files for a lesson |
+
+## Hierarchy
+
+Content is organized as **Course → Unit → Lesson**:
+
+1. A **Course** is the top-level container (e.g. "English A1")
+2. A **Unit** belongs to a Course (e.g. "Unit 1: Greetings")
+3. A **Lesson** belongs to a Unit (e.g. "Lesson 1: Hello and Goodbye")
+
+Each Lesson can have one or more **Curriculum Source** files uploaded.
+
+## Curriculum Upload
+
+### Supported File Types
+
+- `.pptx` — PowerPoint presentations
+- `.pdf` — PDF documents
+- `.docx` — Word documents
+- `.xlsx` — Excel spreadsheets
+
+Unsupported file types are rejected with HTTP 415.
+
+### Upload Endpoint
+
+```
+POST /api/lessons/{lesson_id}/curriculum
+Content-Type: multipart/form-data
+```
+
+The uploaded file is stored locally during development and a
+`CurriculumSource` database record is created with:
+
+| Field               | Description                                      |
+| ------------------- | ------------------------------------------------ |
+| `lesson_id`         | The lesson the file belongs to                   |
+| `original_filename` | The filename as uploaded by the user             |
+| `file_type`         | The file extension (e.g. `pptx`, `pdf`)          |
+| `storage_path`      | Relative path within the storage root            |
+| `uploaded_at`       | Timestamp of upload                              |
+| `processing_status` | Always `pending` initially (AI analysis is Step 6) |
+
+## Local File Storage
+
+Uploaded curriculum files are stored on the local filesystem during
+development under:
+
+```
+storage/curriculum/{course_id}/{unit_id}/{lesson_id}/{safe_filename}
+```
+
+### Configuration
+
+The storage root is configured via the `STORAGE_ROOT` environment variable:
+
+```
+STORAGE_ROOT=../storage
+```
+
+Relative paths resolve from the `backend/` directory.
+
+### Storage Abstraction
+
+The backend uses a `StorageProvider` abstraction layer:
+
+- `StorageProvider` — abstract base class (ABC)
+- `LocalStorageProvider` — default implementation for development
+
+To move to cloud storage later, implement a new class
+(e.g. `S3StorageProvider`, `R2StorageProvider`, `MinIOStorageProvider`)
+that inherits from `StorageProvider` and inject it into
+`CurriculumService`. No lesson or curriculum logic needs to change.
+
+### Security
+
+- Filenames are sanitized to prevent path traversal attacks
+- Original filenames are preserved in the database record
+- The `storage_path` in the database is always relative to the storage root
 
 ## Project Structure
 

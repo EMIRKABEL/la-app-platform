@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api, Course } from "@/lib/api";
 import { NewCourseForm } from "@/components/NewCourseForm";
 
@@ -88,16 +89,22 @@ export default function CoursesPage() {
             {courses.map((course) => (
               <tr
                 key={course.id}
-                className="border-b border-gray-100 text-sm"
+                className="cursor-pointer border-b border-gray-100 text-sm transition-colors hover:bg-gray-50"
               >
-                <td className="py-3 pr-4 font-medium text-gray-900">
-                  {course.name}
+                <td className="py-3 pr-4 font-medium text-indigo-600">
+                  <Link href={`/courses/${course.id}`}>
+                    {course.name}
+                  </Link>
                 </td>
                 <td className="py-3 pr-4 text-gray-600">
-                  {course.description || "—"}
+                  <Link href={`/courses/${course.id}`} className="text-gray-600">
+                    {course.description || "—"}
+                  </Link>
                 </td>
                 <td className="py-3 pr-4 text-gray-500">
-                  {new Date(course.created_at).toLocaleDateString()}
+                  <Link href={`/courses/${course.id}`} className="text-gray-500">
+                    {new Date(course.created_at).toLocaleDateString()}
+                  </Link>
                 </td>
               </tr>
             ))}

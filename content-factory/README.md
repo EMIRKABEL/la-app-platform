@@ -61,15 +61,19 @@ content-factory/
 │   │   ├── layout.tsx       # Root layout with sidebar
 │   │   ├── page.tsx         # Dashboard (placeholder)
 │   │   ├── courses/
-│   │   │   └── page.tsx     # Courses list + New Course form
-│   │   ├── lessons/         # Lessons (placeholder)
+│   │   │   ├── page.tsx     # Courses list (clickable links to detail)
+│   │   │   └── [id]/
+│   │   │       └── page.tsx # Course detail: units + lessons management
+│   │   ├── lessons/
+│   │   │   └── [id]/
+│   │   │           └── page.tsx # Lesson detail: curriculum upload + listing
 │   │   ├── assets/          # Assets (placeholder)
 │   │   └── settings/        # Settings (placeholder)
 │   ├── components/
 │   │   ├── Sidebar.tsx       # Admin sidebar navigation
 │   │   └── NewCourseForm.tsx # Create course form
 │   └── lib/
-│       └── api.ts            # Reusable API client
+│       └── api.ts            # Reusable API client (courses, units, lessons, curriculum)
 ├── package.json
 ├── tsconfig.json
 ├── tailwind.config.ts
@@ -77,6 +81,22 @@ content-factory/
 ├── .env.example
 └── README.md
 ```
+
+## Content Hierarchy
+
+The Content Factory follows a **Course → Unit → Lesson** hierarchy:
+
+1. **Courses** — list at `/courses`, detail at `/courses/{id}`
+2. **Units** — created and managed on the Course detail page
+3. **Lessons** — created inside units (expand a unit to see lessons)
+4. **Curriculum** — uploaded on the Lesson detail page at `/lessons/{id}`
+
+### Supported Curriculum File Types
+
+- `.pptx` — PowerPoint presentations
+- `.pdf` — PDF documents
+- `.docx` — Word documents
+- `.xlsx` — Excel spreadsheets
 
 ## Running Backend + Frontend Together
 
