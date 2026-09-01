@@ -1,0 +1,48 @@
+# ============================================================
+# LA App Platform — Docker Compose (skeleton)
+# ============================================================
+# This file provides a starting point for local development.
+# Services are placeholders and will be expanded as each
+# component is built out.
+# ============================================================
+
+version: "3.9"
+
+services:
+  # ---- PostgreSQL Database ----
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: laapp
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: laapp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # ---- Backend API (FastAPI) ----
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://laapp:changeme@postgres:5432/laapp
+    ports:
+      - "8000:8000"
+
+  # ---- Content Factory (Next.js) ----
+  content-factory:
+    build:
+      context: ./content-factory
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
