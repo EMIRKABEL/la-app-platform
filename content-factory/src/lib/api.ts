@@ -52,6 +52,31 @@ export interface CurriculumSource {
   storage_path: string;
   uploaded_at: string;
   processing_status: string;
+  extracted_at: string | null;
+}
+
+export interface ExtractionSlide {
+  slide_number: number;
+  title: string | null;
+  texts: string[];
+  tables: string[][][];
+  notes: string | null;
+}
+
+export interface ExtractionData {
+  source_type: string;
+  metadata: Record<string, unknown>;
+  slides: ExtractionSlide[];
+}
+
+export interface ExtractionResponse {
+  id: string;
+  lesson_id: string;
+  original_filename: string;
+  file_type: string | null;
+  processing_status: string;
+  extracted_at: string | null;
+  extracted_data: ExtractionData | null;
 }
 
 // ── Request helper ───────────────────────────────────────────────
@@ -146,4 +171,12 @@ export const api = {
 
     return res.json() as Promise<CurriculumSource>;
   },
+
+  extractCurriculum: (curriculumId: string) =>
+    request<ExtractionResponse>(`/api/curriculum/${curriculumId}/extract`, {
+      method: "POST",
+    }),
+
+  getExtraction: (curriculumId: string) =>
+    request<ExtractionResponse>(`/api/curriculum/${curriculumId}/extraction`),
 };

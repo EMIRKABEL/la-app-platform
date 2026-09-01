@@ -71,6 +71,11 @@ class StorageProvider(abc.ABC):
         """Return ``True`` if a file exists at ``storage_path``."""
         ...
 
+    @abc.abstractmethod
+    def read_file(self, storage_path: str) -> bytes:
+        """Return the raw bytes of the file at ``storage_path``."""
+        ...
+
 
 class LocalStorageProvider(StorageProvider):
     """Store files on the local filesystem during development.
@@ -118,3 +123,7 @@ class LocalStorageProvider(StorageProvider):
 
     def file_exists(self, storage_path: str) -> bool:
         return (self._root / storage_path).is_file()
+
+    def read_file(self, storage_path: str) -> bytes:
+        """Return the raw bytes of the file at ``storage_path``."""
+        return (self._root / storage_path).read_bytes()

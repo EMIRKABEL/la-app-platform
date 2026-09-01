@@ -9,6 +9,7 @@ from app.models.mixins import UUIDPrimaryKeyMixin
 from app.db.session import Base
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Uuid, func
+from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -34,6 +35,14 @@ class CurriculumSource(UUIDPrimaryKeyMixin, Base):
         Enum(CurriculumProcessingStatus, name="curriculum_processing_status"),
         default=CurriculumProcessingStatus.pending,
         nullable=False,
+    )
+    extracted_data: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+    extracted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )
 
     lesson: Mapped["Lesson"] = relationship(back_populates="curriculum_sources")

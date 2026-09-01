@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, Lesson, Unit, Course, CurriculumSource } from "@/lib/api";
+import {
+  api,
+  Lesson,
+  Unit,
+  Course,
+  CurriculumSource,
+  ExtractionResponse,
+} from "@/lib/api";
 
 const ACCEPTED_EXTENSIONS = ".pptx,.pdf,.docx,.xlsx";
 
@@ -24,6 +31,13 @@ export default function LessonDetailPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Extraction state
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [extractionSuccess, setExtractionSuccess] = useState<string | null>(null);
+  const [viewingExtraction, setViewingExtraction] = useState<ExtractionResponse | null>(null);
+  const [viewingExtractionLoading, setViewingExtractionLoading] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -93,6 +107,45 @@ export default function LessonDetailPage() {
       );
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleExtract = async (sourceId: string) => {
+    setExtractingId(sourceId);
+    setExtractionError(null);
+    setExtractionSuccess(null);
+
+    try {
+      const result = await api.extractCurriculum(sourceId);
+      setExtractionSuccess(
+        `Extraction complete: ${result.extracted_data?.metadata?.slide_count ?? 0} slides extracted.`,
+      );
+      setTimeout(() => setExtractionSuccess(null), 5000);
+      await refreshCurriculum();
+      // Auto-show the extraction
+      setViewingExtraction(result);
+    } catch (err) {
+      setExtractionError(
+        err instanceof Error ? err.message : "Extraction failed",
+      );
+    } finally {
+      setExtractingId(null);
+    }
+  };
+
+  const handleViewExtraction = async (sourceId: string) => {
+    setViewingExtractionLoading(true);
+    setExtractionError(null);
+
+    try {
+      const result = await api.getExtraction(sourceId);
+      setViewingExtraction(result);
+    } catch (err) {
+      setExtractionError(
+        err instanceof Error ? err.message : "Failed to load extraction",
+      );
+    } finally {
+      setViewingExtractionLoading(false);
     }
   };
 
@@ -166,6 +219,12 @@ export default function LessonDetailPage() {
       {successMessage && (
         <div className="mb-4 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700">
           {successMessage}
+        </div>
+      )}
+
+      {extractionSuccess && (
+        <div className="mb-4 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700">
+          {extractionSuccess}
         </div>
       )}
 
@@ -249,6 +308,7 @@ export default function LessonDetailPage() {
               <th className="py-3 pr-4 font-medium">Type</th>
               <th className="py-3 pr-4 font-medium">Uploaded</th>
               <th className="py-3 pr-4 font-medium">Status</th>
+              <th className="py-3 pr-4 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -264,14 +324,150 @@ export default function LessonDetailPage() {
                   {new Date(src.uploaded_at).toLocaleString()}
                 </td>
                 <td className="py-3 pr-4">
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      src.processing_status === "completed"
+                        ? "bg-green-100 text-green-800"
+                        : src.processing_status === "failed"
+                          ? "bg-red-100 text-red-800"
+                          : src.processing_status === "processing"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
                     {src.processing_status}
                   </span>
+                </td>
+                <td className="py-3 pr-4">
+                  <div className="flex items-center gap-2">
+                    {src.file_type === "pptx" && (
+                      <button
+                        onClick={() => handleExtract(src.id)}
+                        disabled={extractingId === src.id}
+                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {extractingId === src.id ? "Extracting..." : "Extract"}
+                      </button>
+                    )}
+                    {src.processing_status === "completed" && (
+                      <button
+                        onClick={() => handleViewExtraction(src.id)}
+                        disabled={viewingExtractionLoading}
+                        className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {viewingExtractionLoading ? "Loading..." : "View Extraction"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* Extraction error */}
+      {extractionError && (
+        <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {extractionError}
+        </div>
+      )}
+
+      {/* Extraction viewer panel */}
+      {viewingExtraction && viewingExtraction.extracted_data && (
+        <div className="mt-6 rounded-md border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Extracted Content — {viewingExtraction.original_filename}
+            </h3>
+            <button
+              onClick={() => setViewingExtraction(null)}
+              className="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
+
+          {/* Metadata */}
+          <div className="mb-4 flex items-center gap-4 text-sm text-gray-500">
+            <span>
+              Source type: <span className="font-medium text-gray-700">{viewingExtraction.extracted_data.source_type}</span>
+            </span>
+            <span>
+              Slide count: <span className="font-medium text-gray-700">{viewingExtraction.extracted_data.metadata?.slide_count as number ?? "—"}</span>
+            </span>
+            {viewingExtraction.extracted_at && (
+              <span>
+                Extracted at: <span className="font-medium text-gray-700">{new Date(viewingExtraction.extracted_at).toLocaleString()}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Slides */}
+          <div className="space-y-4">
+            {viewingExtraction.extracted_data.slides?.map((slide) => (
+              <div key={slide.slide_number} className="rounded-md border border-gray-200 p-4">
+                <div className="mb-2 flex items-center gap-3">
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                    Slide {slide.slide_number}
+                  </span>
+                  {slide.title && (
+                    <span className="text-sm font-medium text-gray-900">
+                      {slide.title}
+                    </span>
+                  )}
+                </div>
+
+                {/* Text blocks */}
+                {slide.texts.length > 0 && (
+                  <div className="mb-2">
+                    <div className="mb-1 text-xs font-medium uppercase text-gray-400">Text Blocks</div>
+                    <ul className="list-inside list-disc space-y-1 text-sm text-gray-700">
+                      {slide.texts.map((text, idx) => (
+                        <li key={idx}>{text}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Tables */}
+                {slide.tables.length > 0 && (
+                  <div className="mb-2">
+                    <div className="mb-1 text-xs font-medium uppercase text-gray-400">Tables</div>
+                    {slide.tables.map((table, tIdx) => (
+                      <table key={tIdx} className="mb-2 border-collapse border border-gray-300 text-xs">
+                        <tbody>
+                          {table.map((row, rIdx) => (
+                            <tr key={rIdx}>
+                              {row.map((cell, cIdx) => (
+                                <td key={cIdx} className="border border-gray-300 px-2 py-1 text-gray-700">
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ))}
+                  </div>
+                )}
+
+                {/* Speaker notes */}
+                {slide.notes && (
+                  <div className="mb-2">
+                    <div className="mb-1 text-xs font-medium uppercase text-gray-400">Speaker Notes</div>
+                    <p className="text-sm text-gray-600 italic">{slide.notes}</p>
+                  </div>
+                )}
+
+                {/* Empty slide */}
+                {slide.texts.length === 0 && slide.tables.length === 0 && !slide.notes && !slide.title && (
+                  <p className="text-sm text-gray-400 italic">No extractable content on this slide.</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Accepted file types hint */}

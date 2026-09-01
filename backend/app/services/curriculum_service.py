@@ -1,4 +1,4 @@
-"""Service layer for curriculum upload and listing."""
+"""Service layer for curriculum upload, listing, and extraction."""
 
 from __future__ import annotations
 
@@ -9,10 +9,13 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.models.curriculum_source import CurriculumSource
+from app.models.enums import CurriculumProcessingStatus
 from app.repositories.curriculum_source_repository import (
     CurriculumSourceRepository,
 )
 from app.repositories.lesson_repository import LessonRepository
+from app.services.extractors import PptxExtractor
+from app.services.extractors.base import BaseExtractor
 from app.services.storage import LocalStorageProvider, StorageProvider
 
 # Supported file extensions for curriculum uploads
@@ -20,6 +23,11 @@ ALLOWED_EXTENSIONS = {".pptx", ".pdf", ".docx", ".xlsx"}
 
 # 50 MB max upload for development
 MAX_FILE_SIZE = 50 * 1024 * 1024
+
+# Registry of extractors keyed by file extension
+_EXTRACTORS: dict[str, BaseExtractor] = {
+    ".pptx": PptxExtractor(),
+}
 
 
 class CurriculumService:
@@ -117,3 +125,61 @@ class CurriculumService:
             storage_path=storage_path,
         )
         return record
+
+    def extract_curriculum(
+        self, curriculum_id: uuid.UUID
+    ) -> CurriculumSource:
+        """Extract structured content from a curriculum source file.
+
+        Supports ``.pptx`` only at this time.
+
+        Raises:
+            FileNotFoundError: If the curriculum source does not exist.
+            ValueError: If the file type is unsupported for extraction.
+            RuntimeError: If the underlying file is missing from storage.
+        """
+        record = self._repo.get_by_id(curriculum_id)
+        if record is None:
+            raise FileNotFoundError("Curriculum source not found")
+
+        file_type = (record.file_type or "").lower()
+        ext = f".{file_type}" if file_type else ""
+
+        extractor = _EXTRACTORS.get(ext)
+        if extractor is None:
+            raise ValueError(
+                f"Extraction not supported for file type '{ext}'. "
+                f"Supported: {', '.join(sorted(_EXTRACTORS.keys()))}"
+            )
+
+        # Transition to processing
+        self._repo.update_status(
+            curriculum_id, CurriculumProcessingStatus.processing
+        )
+
+        try:
+            # Read the file from storage
+            file_bytes = self._storage.read_file(record.storage_path)
+
+            # Extract
+            result = extractor.extract(file_bytes)
+
+            # Save extraction and transition to completed
+            record = self._repo.save_extraction(
+                curriculum_id,
+                extracted_data=dict(result),
+            )
+            return record  # type: ignore[return-value]
+
+        except Exception:
+            # Transition to failed on any error
+            self._repo.update_status(
+                curriculum_id, CurriculumProcessingStatus.failed
+            )
+            raise
+
+    def get_extraction(
+        self, curriculum_id: uuid.UUID
+    ) -> CurriculumSource | None:
+        """Return the curriculum source with its extracted data."""
+        return self._repo.get_by_id(curriculum_id)

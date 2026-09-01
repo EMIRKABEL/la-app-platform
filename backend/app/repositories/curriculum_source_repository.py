@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,6 +29,42 @@ class CurriculumSourceRepository:
             .order_by(CurriculumSource.uploaded_at.desc())
         )
         return list(self._db.scalars(stmt).all())
+
+    def get_by_id(self, curriculum_id: uuid.UUID) -> CurriculumSource | None:
+        """Return a single curriculum source by id, or ``None``."""
+        stmt = select(CurriculumSource).where(CurriculumSource.id == curriculum_id)
+        return self._db.scalars(stmt).first()
+
+    def update_status(
+        self,
+        curriculum_id: uuid.UUID,
+        status: CurriculumProcessingStatus,
+    ) -> CurriculumSource | None:
+        """Update the processing status of a curriculum source."""
+        record = self.get_by_id(curriculum_id)
+        if record is None:
+            return None
+        record.processing_status = status
+        self._db.commit()
+        self._db.refresh(record)
+        return record
+
+    def save_extraction(
+        self,
+        curriculum_id: uuid.UUID,
+        extracted_data: dict[str, Any],
+        status: CurriculumProcessingStatus = CurriculumProcessingStatus.completed,
+    ) -> CurriculumSource | None:
+        """Save extracted curriculum data and update status/timestamp."""
+        record = self.get_by_id(curriculum_id)
+        if record is None:
+            return None
+        record.extracted_data = extracted_data
+        record.extracted_at = datetime.now(timezone.utc)
+        record.processing_status = status
+        self._db.commit()
+        self._db.refresh(record)
+        return record
 
     def create(
         self,

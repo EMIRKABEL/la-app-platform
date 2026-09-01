@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -20,3 +21,18 @@ class CurriculumSourceResponse(BaseModel):
     storage_path: str
     uploaded_at: datetime
     processing_status: str
+    extracted_at: datetime | None = None
+
+
+class ExtractionResponse(BaseModel):
+    """Schema for curriculum extraction responses."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    original_filename: str
+    file_type: str | None
+    processing_status: str
+    extracted_at: datetime | None
+    extracted_data: dict[str, Any] | None
