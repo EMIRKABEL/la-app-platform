@@ -5,14 +5,96 @@ The **Content Factory** is a web application built with **Next.js** (TypeScript)
 - Author and organize educational content
 - Create lessons and learning paths
 - Manage media assets and resources
-- Preview and publish content to the student platform
 
 ## Tech Stack
 
-- Next.js (React)
+- Next.js 14 (App Router)
 - TypeScript
-- Tailwind CSS (planned)
+- Tailwind CSS
 
-## Status
+## Setup
 
-This folder is currently a placeholder. The Next.js application will be initialized here in a future step.
+### 1. Install Node.js
+
+Requires Node.js 18+. Download from [https://nodejs.org](https://nodejs.org).
+
+### 2. Install dependencies
+
+```bash
+cd content-factory
+npm install
+```
+
+### 3. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### 4. Run the development server
+
+```bash
+npm run dev
+```
+
+The app will be available at `http://localhost:3000`.
+
+### 5. Build for production
+
+```bash
+npm run build
+npm start
+```
+
+## Project Structure
+
+```
+content-factory/
+├── src/
+│   ├── app/                 # Next.js App Router pages
+│   │   ├── layout.tsx       # Root layout with sidebar
+│   │   ├── page.tsx         # Dashboard (placeholder)
+│   │   ├── courses/
+│   │   │   └── page.tsx     # Courses list + New Course form
+│   │   ├── lessons/         # Lessons (placeholder)
+│   │   ├── assets/          # Assets (placeholder)
+│   │   └── settings/        # Settings (placeholder)
+│   ├── components/
+│   │   ├── Sidebar.tsx       # Admin sidebar navigation
+│   │   └── NewCourseForm.tsx # Create course form
+│   └── lib/
+│       └── api.ts            # Reusable API client
+├── package.json
+├── tsconfig.json
+├── tailwind.config.ts
+├── next.config.js
+├── .env.example
+└── README.md
+```
+
+## Running Backend + Frontend Together
+
+1. Start the backend (from the `backend/` directory):
+
+```bash
+uvicorn app.main:app --reload
+```
+
+2. Start the frontend (from the `content-factory/` directory):
+
+```bash
+npm run dev
+```
+
+3. Open `http://localhost:3000` in your browser.
+4. Navigate to **Courses** to create and view courses.
+
+## License
+
+All rights reserved.

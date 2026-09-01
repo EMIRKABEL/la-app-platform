@@ -47,7 +47,17 @@ Edit `.env`:
 DATABASE_URL=postgresql://laapp:changeme@localhost:5432/laapp
 ```
 
-### 4. Run Alembic migrations
+> **Local development without PostgreSQL:**
+> You can use SQLite temporarily by setting:
+> ```
+> DATABASE_URL=sqlite:///./laapp.db
+> ```
+> Then create tables with:
+> ```bash
+> python -c "from app.db.session import Base, engine; from app.models import *; Base.metadata.create_all(bind=engine)"
+> ```
+
+### 4. Run Alembic migrations (PostgreSQL)
 
 ```bash
 alembic upgrade head
@@ -63,6 +73,8 @@ The API will be available at `http://localhost:8000`.
 
 Health check: `GET http://localhost:8000/health`
 
+Interactive docs: `http://localhost:8000/docs`
+
 ### 6. Run tests
 
 ```bash
@@ -71,29 +83,45 @@ pytest
 
 Tests use SQLite in-memory and do **not** require a running PostgreSQL instance.
 
+## API Endpoints
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/health` | Health check |
+| `GET` | `/api/courses` | List all courses (newest first) |
+| `POST` | `/api/courses` | Create a new course |
+| `GET` | `/api/courses/{course_id}` | Get a single course (404 if not found) |
+
 ## Project Structure
 
 ```
 backend/
 ├── app/
 │   ├── main.py              # FastAPI application entry point
-│   ├── api/                 # API route definitions (future)
-│   │   └── __init__.py
+│   ├── api/                 # API route definitions
+│   │   ├── __init__.py
+│   │   └── courses.py       # Course CRUD endpoints
 │   ├── core/                # Configuration and settings
+│   │   ├── __init__.py
 │   │   └── config.py
 │   ├── db/                  # Database session and engine
-│   │   └── session.py
+│   │   ├── __init__.py
+│   │   ├── session.py
+│   │   └── types.py         # Portable JSONB type
 │   ├── models/              # SQLAlchemy ORM models
 │   │   └── ...
-│   ├── schemas/             # Pydantic schemas (future)
-│   │   └── __init__.py
-│   └── services/            # Business logic (future)
-│       └── __init__.py
+│   ├── repositories/        # Data-access layer
+│   │   └── course_repository.py
+│   ├── schemas/             # Pydantic schemas
+│   │   └── course.py
+│   └── services/            # Business logic layer
+│       └── course_service.py
 ├── tests/                   # pytest test suite
 ├── alembic/                 # Migration scripts
 ├── alembic.ini              # Alembic configuration
 ├── requirements.txt         # Python dependencies
 ├── .env.example             # Example environment file
+├── .python-version          # Python 3.12
 └── README.md
 ```
 
