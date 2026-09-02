@@ -67,6 +67,17 @@ class StorageProvider(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def save_course_file(
+        self,
+        *,
+        course_id: str,
+        original_filename: str,
+        data: bytes,
+    ) -> str:
+        """Save course-level ``data`` and return the relative storage path."""
+        ...
+
+    @abc.abstractmethod
     def file_exists(self, storage_path: str) -> bool:
         """Return ``True`` if a file exists at ``storage_path``."""
         ...
@@ -104,6 +115,38 @@ class LocalStorageProvider(StorageProvider):
     ) -> str:
         safe_name = sanitize_filename(original_filename)
         rel_dir = Path("curriculum") / course_id / unit_id / lesson_id
+        abs_dir = self._root / rel_dir
+        abs_dir.mkdir(parents=True, exist_ok=True)
+
+        # If the file already exists, prepend a short UUID to avoid
+        # silent overwrite.
+        target = abs_dir / safe_name
+        if target.exists():
+            stem = target.stem
+            suffix = target.suffix
+            safe_name = f"{stem}_{uuid.uuid4().hex[:8]}{suffix}"
+            target = abs_dir / safe_name
+
+        target.write_bytes(data)
+
+        # Return a forward-slash path relative to the storage root
+        return str(rel_dir / safe_name).replace("\\", "/")
+
+    def save_course_file(
+        self,
+        *,
+        course_id: str,
+        original_filename: str,
+        data: bytes,
+    ) -> str:
+        """Save a course-level curriculum file.
+
+        Files are stored under::
+
+            {storage_root}/curriculum/courses/{course_id}/{safe_filename}
+        """
+        safe_name = sanitize_filename(original_filename)
+        rel_dir = Path("curriculum") / "courses" / course_id
         abs_dir = self._root / rel_dir
         abs_dir.mkdir(parents=True, exist_ok=True)
 

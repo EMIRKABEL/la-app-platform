@@ -22,6 +22,11 @@ class Course(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         cascade="all, delete-orphan",
         order_by="Unit.number",
     )
+    course_curriculum_sources: Mapped[list["CourseCurriculumSource"]] = relationship(
+        back_populates="course",
+        cascade="all, delete-orphan",
+        order_by="CourseCurriculumSource.uploaded_at.desc()",
+    )
 
     def __repr__(self) -> str:
         return f"<Course {self.name}>"

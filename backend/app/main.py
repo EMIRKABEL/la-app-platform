@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
+    course_curriculum_router,
     courses_router,
     curriculum_router,
     lessons_router,
@@ -44,3 +45,4 @@ app.include_router(courses_router)
 app.include_router(units_router)
 app.include_router(lessons_router)
 app.include_router(curriculum_router)
+app.include_router(course_curriculum_router)

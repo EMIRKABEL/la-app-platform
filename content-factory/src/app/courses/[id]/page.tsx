@@ -1,9 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api, Course, Unit, Lesson } from "@/lib/api";
+import {
+  api,
+  Course,
+  Unit,
+  Lesson,
+  CourseCurriculumSource,
+  CourseExtractionResponse,
+} from "@/lib/api";
+
+const ACCEPTED_EXTENSIONS = ".pptx,.pdf,.docx,.xlsx";
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -13,6 +22,21 @@ export default function CourseDetailPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Course curriculum state
+  const [courseCurriculum, setCourseCurriculum] = useState<CourseCurriculumSource[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [courseSuccess, setCourseSuccess] = useState<string | null>(null);
+  const courseFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Extraction state
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [extractionSuccess, setExtractionSuccess] = useState<string | null>(null);
+  const [viewingExtraction, setViewingExtraction] = useState<CourseExtractionResponse | null>(null);
+  const [viewingExtractionLoading, setViewingExtractionLoading] = useState(false);
 
   // New unit form state
   const [showUnitForm, setShowUnitForm] = useState(false);
@@ -37,12 +61,14 @@ export default function CourseDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [c, u] = await Promise.all([
+      const [c, u, cc] = await Promise.all([
         api.getCourse(courseId),
         api.listUnits(courseId),
+        api.listCourseCurriculum(courseId),
       ]);
       setCourse(c);
       setUnits(u);
+      setCourseCurriculum(cc);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load course");
     } finally {
@@ -53,6 +79,97 @@ export default function CourseDetailPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const refreshCourseCurriculum = useCallback(async () => {
+    try {
+      const cc = await api.listCourseCurriculum(courseId);
+      setCourseCurriculum(cc);
+    } catch {
+      // ignore
+    }
+  }, [courseId]);
+
+  // ── Course curriculum handlers ──────────────────────────────
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFiles(Array.from(e.target.files));
+      setUploadError(null);
+    }
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedFiles.length === 0) return;
+
+    setUploading(true);
+    setUploadError(null);
+    setCourseSuccess(null);
+
+    try {
+      const records = await api.uploadCourseCurriculum(courseId, selectedFiles);
+      const skipped = selectedFiles.length - records.length;
+      if (skipped > 0) {
+        setCourseSuccess(
+          `${records.length} file(s) uploaded. ${skipped} unsupported file(s) skipped.`,
+        );
+      } else {
+        setCourseSuccess(`${records.length} file(s) uploaded successfully.`);
+      }
+      setSelectedFiles([]);
+      if (courseFileInputRef.current) {
+        courseFileInputRef.current.value = "";
+      }
+      setTimeout(() => setCourseSuccess(null), 5000);
+      await refreshCourseCurriculum();
+    } catch (err) {
+      setUploadError(
+        err instanceof Error ? err.message : "Failed to upload files",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleExtract = async (sourceId: string) => {
+    setExtractingId(sourceId);
+    setExtractionError(null);
+    setExtractionSuccess(null);
+
+    try {
+      const result = await api.extractCourseCurriculum(sourceId);
+      setExtractionSuccess(
+        `Extraction complete: ${result.extracted_data?.metadata?.slide_count as number ?? 0} slides extracted.`,
+      );
+      setTimeout(() => setExtractionSuccess(null), 5000);
+      await refreshCourseCurriculum();
+      setViewingExtraction(result);
+    } catch (err) {
+      setExtractionError(
+        err instanceof Error ? err.message : "Extraction failed",
+      );
+    } finally {
+      setExtractingId(null);
+    }
+  };
+
+  const handleViewExtraction = async (sourceId: string) => {
+    setViewingExtractionLoading(true);
+    setExtractionError(null);
+
+    try {
+      const result = await api.getCourseExtraction(sourceId);
+      setViewingExtraction(result);
+    } catch (err) {
+      setExtractionError(
+        err instanceof Error ? err.message : "Failed to load extraction",
+      );
+    } finally {
+      setViewingExtractionLoading(false);
+    }
+  };
+
+  // ── Unit/Lesson handlers ─────────────────────────────────────
 
   const handleCreateUnit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,6 +273,272 @@ export default function CourseDetailPage() {
         )}
       </div>
 
+      {/* Course Curriculum section */}
+      <div className="mb-8">
+        <h2 className="mb-3 border-b border-gray-200 pb-2 text-lg font-bold text-gray-900">
+          Course Curriculum
+        </h2>
+
+        {courseSuccess && (
+          <div className="mb-4 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700">
+            {courseSuccess}
+          </div>
+        )}
+        {extractionSuccess && (
+          <div className="mb-4 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700">
+            {extractionSuccess}
+          </div>
+        )}
+
+        {/* Upload bar */}
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm text-gray-500">
+            Upload curriculum files for the entire course.
+          </p>
+          <button
+            onClick={() => courseFileInputRef.current?.click()}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            Upload Curriculum
+          </button>
+        </div>
+
+        {/* Upload form */}
+        <form onSubmit={handleUpload} className="mb-6">
+          <input
+            ref={courseFileInputRef}
+            type="file"
+            accept={ACCEPTED_EXTENSIONS}
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          {selectedFiles.length > 0 && (
+            <div className="mb-3 rounded-md border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div className="mb-2 text-sm font-medium text-gray-700">
+                Selected files ({selectedFiles.length}):
+              </div>
+              <ul className="mb-3 space-y-1 text-sm text-gray-600">
+                {selectedFiles.map((f, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <span className="font-medium">{f.name}</span>
+                    <span className="text-xs text-gray-400">
+                      ({(f.size / 1024).toFixed(1)} KB)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {uploading ? "Uploading..." : "Confirm Upload"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedFiles([]);
+                    if (courseFileInputRef.current) {
+                      courseFileInputRef.current.value = "";
+                    }
+                  }}
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {uploading && (
+            <div className="mb-3 text-sm text-gray-500">Uploading files...</div>
+          )}
+          {uploadError && (
+            <div className="mb-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {uploadError}
+            </div>
+          )}
+        </form>
+
+        {/* Curriculum table */}
+        {courseCurriculum.length === 0 && !uploading && (
+          <p className="text-gray-500">
+            No curriculum files uploaded yet.
+          </p>
+        )}
+
+        {courseCurriculum.length > 0 && (
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-sm text-gray-500">
+                <th className="py-3 pr-4 font-medium">Filename</th>
+                <th className="py-3 pr-4 font-medium">Type</th>
+                <th className="py-3 pr-4 font-medium">Uploaded</th>
+                <th className="py-3 pr-4 font-medium">Status</th>
+                <th className="py-3 pr-4 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {courseCurriculum.map((src) => (
+                <tr key={src.id} className="border-b border-gray-100 text-sm">
+                  <td className="py-3 pr-4 font-medium text-gray-900">
+                    {src.original_filename}
+                  </td>
+                  <td className="py-3 pr-4 text-gray-600 uppercase">
+                    {src.file_type || "—"}
+                  </td>
+                  <td className="py-3 pr-4 text-gray-500">
+                    {new Date(src.uploaded_at).toLocaleString()}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        src.processing_status === "completed"
+                          ? "bg-green-100 text-green-800"
+                          : src.processing_status === "failed"
+                            ? "bg-red-100 text-red-800"
+                            : src.processing_status === "processing"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {src.processing_status}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex items-center gap-2">
+                      {src.file_type === "pptx" && (
+                        <button
+                          onClick={() => handleExtract(src.id)}
+                          disabled={extractingId === src.id}
+                          className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {extractingId === src.id ? "Extracting..." : "Extract"}
+                        </button>
+                      )}
+                      {src.processing_status === "completed" && (
+                        <button
+                          onClick={() => handleViewExtraction(src.id)}
+                          disabled={viewingExtractionLoading}
+                          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {viewingExtractionLoading ? "Loading..." : "View Extraction"}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {/* Extraction error */}
+        {extractionError && (
+          <div className="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {extractionError}
+          </div>
+        )}
+
+        {/* Extraction viewer panel */}
+        {viewingExtraction && viewingExtraction.extracted_data && (
+          <div className="mt-6 rounded-md border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Extracted Content — {viewingExtraction.original_filename}
+              </h3>
+              <button
+                onClick={() => setViewingExtraction(null)}
+                className="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Metadata */}
+            <div className="mb-4 flex items-center gap-4 text-sm text-gray-500">
+              <span>
+                Source type: <span className="font-medium text-gray-700">{viewingExtraction.extracted_data.source_type}</span>
+              </span>
+              <span>
+                Slide count: <span className="font-medium text-gray-700">{viewingExtraction.extracted_data.metadata?.slide_count as number ?? "—"}</span>
+              </span>
+              {viewingExtraction.extracted_at && (
+                <span>
+                  Extracted at: <span className="font-medium text-gray-700">{new Date(viewingExtraction.extracted_at).toLocaleString()}</span>
+                </span>
+              )}
+            </div>
+
+            {/* Slides */}
+            <div className="space-y-4">
+              {viewingExtraction.extracted_data.slides?.map((slide) => (
+                <div key={slide.slide_number} className="rounded-md border border-gray-200 p-4">
+                  <div className="mb-2 flex items-center gap-3">
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      Slide {slide.slide_number}
+                    </span>
+                    {slide.title && (
+                      <span className="text-sm font-medium text-gray-900">
+                        {slide.title}
+                      </span>
+                    )}
+                  </div>
+                  {slide.texts.length > 0 && (
+                    <div className="mb-2">
+                      <div className="mb-1 text-xs font-medium uppercase text-gray-400">Text Blocks</div>
+                      <ul className="list-inside list-disc space-y-1 text-sm text-gray-700">
+                        {slide.texts.map((text, idx) => (
+                          <li key={idx}>{text}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {slide.tables.length > 0 && (
+                    <div className="mb-2">
+                      <div className="mb-1 text-xs font-medium uppercase text-gray-400">Tables</div>
+                      {slide.tables.map((table, tIdx) => (
+                        <table key={tIdx} className="mb-2 border-collapse border border-gray-300 text-xs">
+                          <tbody>
+                            {table.map((row, rIdx) => (
+                              <tr key={rIdx}>
+                                {row.map((cell, cIdx) => (
+                                  <td key={cIdx} className="border border-gray-300 px-2 py-1 text-gray-700">
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ))}
+                    </div>
+                  )}
+                  {slide.notes && (
+                    <div className="mb-2">
+                      <div className="mb-1 text-xs font-medium uppercase text-gray-400">Speaker Notes</div>
+                      <p className="text-sm text-gray-600 italic">{slide.notes}</p>
+                    </div>
+                  )}
+                  {slide.texts.length === 0 && slide.tables.length === 0 && !slide.notes && !slide.title && (
+                    <p className="text-sm text-gray-400 italic">No extractable content on this slide.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className="mt-4 text-xs text-gray-400">
+          Accepted file types: PPTX, PDF, DOCX, XLSX — Multiple files can be selected at once.
+        </p>
+      </div>
+
+      {/* Divider */}
+      <hr className="mb-8 border-gray-200" />
+
+      {/* Units section */}
       {successMessage && (
         <div className="mb-4 rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700">
           {successMessage}
@@ -168,7 +551,6 @@ export default function CourseDetailPage() {
         </div>
       )}
 
-      {/* Units section */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Units</h2>
         <button

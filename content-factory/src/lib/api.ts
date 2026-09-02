@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -72,6 +72,27 @@ export interface ExtractionData {
 export interface ExtractionResponse {
   id: string;
   lesson_id: string;
+  original_filename: string;
+  file_type: string | null;
+  processing_status: string;
+  extracted_at: string | null;
+  extracted_data: ExtractionData | null;
+}
+
+export interface CourseCurriculumSource {
+  id: string;
+  course_id: string;
+  original_filename: string;
+  file_type: string | null;
+  storage_path: string;
+  uploaded_at: string;
+  processing_status: string;
+  extracted_at: string | null;
+}
+
+export interface CourseExtractionResponse {
+  id: string;
+  course_id: string;
   original_filename: string;
   file_type: string | null;
   processing_status: string;
@@ -179,4 +200,42 @@ export const api = {
 
   getExtraction: (curriculumId: string) =>
     request<ExtractionResponse>(`/api/curriculum/${curriculumId}/extraction`),
+
+  // Course-level Curriculum
+  listCourseCurriculum: (courseId: string) =>
+    request<CourseCurriculumSource[]>(`/api/courses/${courseId}/curriculum`),
+
+  uploadCourseCurriculum: async (
+    courseId: string,
+    files: File[],
+  ): Promise<CourseCurriculumSource[]> => {
+    const url = `${API_URL}/api/courses/${courseId}/curriculum`;
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file);
+    }
+
+    const res = await fetch(url, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`API error ${res.status}: ${body}`);
+    }
+
+    return res.json() as Promise<CourseCurriculumSource[]>;
+  },
+
+  extractCourseCurriculum: (sourceId: string) =>
+    request<CourseExtractionResponse>(
+      `/api/course-curriculum/${sourceId}/extract`,
+      { method: "POST" },
+    ),
+
+  getCourseExtraction: (sourceId: string) =>
+    request<CourseExtractionResponse>(
+      `/api/course-curriculum/${sourceId}/extraction`,
+    ),
 };

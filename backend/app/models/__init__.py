@@ -5,6 +5,7 @@
 from app.models.activity import Activity
 from app.models.asset import Asset
 from app.models.course import Course
+from app.models.course_curriculum_source import CourseCurriculumSource
 from app.models.curriculum_source import CurriculumSource
 from app.models.lesson import Lesson
 from app.models.lesson_objective import LessonObjective
@@ -15,6 +16,7 @@ __all__ = [
     "Activity",
     "Asset",
     "Course",
+    "CourseCurriculumSource",
     "CurriculumSource",
     "Lesson",
     "LessonObjective",
